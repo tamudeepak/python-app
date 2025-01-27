@@ -1,64 +1,43 @@
 pipeline {
     agent any
+
     environment {
-        DOCKER_API = "http://192.168.17.153:2375"
+        DOCKER_HOST = "tcp://192.168.17.153:2375" // Docker API endpoint
     }
+
     stages {
         stage('Checkout Code') {
             steps {
                 git branch: 'master', url: 'https://github.com/tamudeepak/python-app.git'
             }
         }
+
         stage('Build Docker Image') {
             steps {
                 script {
-                    powershell '''
-                        $ErrorActionPreference = 'Stop'
-                        
-                        # First, let's verify Docker API is accessible
-                        try {
-                            $testApi = Invoke-WebRequest -Uri "${env:DOCKER_API}/version" -Method GET
-                            Write-Host "Docker API is accessible"
-                        } catch {
-                            throw "Cannot connect to Docker API: $_"
-                        }
-                        
-                        # Send Dockerfile and context directly
-                        $headers = @{
-                            'Content-Type' = 'application/x-tar'
-                        }
-                        
-                        $buildUrl = "${env:DOCKER_API}/build?t=python-app1:latest"
-                        
-                        Write-Host "Starting Docker build via API..."
-                        
-                        # Read Dockerfile content
-                        $dockerfileContent = Get-Content -Path Dockerfile -Raw
-                        
-                        # Create a simple tar-like structure
-                        $body = [System.Text.Encoding]::UTF8.GetBytes($dockerfileContent)
-                        
-                        try {
-                            $response = Invoke-RestMethod -Uri $buildUrl -Method Post -Body $body -Headers $headers
-                            Write-Host "Build Response: $response"
-                        } catch {
-                            Write-Host "Error during build: $_"
-                            throw
-                        }
-                    '''
+                    try {
+                        echo "Starting Docker build..."
+                        // Use PowerShell to call Docker build through API
+                        def buildUrl = "${env.DOCKER_HOST}/build?t=python-app1:latest"
+                        def response = powershell(script: """
+                            \$response = Invoke-RestMethod -Uri '$buildUrl' -Method Post
+                            Write-Output 'Response: ' + \$response
+                        """, returnStdout: true).trim()
+
+                        echo "Build response: ${response}"
+                    } catch (Exception e) {
+                        echo "Error during Docker build: ${e.getMessage()}"
+                        currentBuild.result = 'FAILURE'
+                    }
                 }
             }
         }
     }
+
     post {
-        success {
-            echo 'Build successful! Docker image created.'
-        }
-        failure {
-            echo 'Build failed! Check logs for details.'
-        }
         always {
             echo 'Pipeline execution completed!'
         }
     }
 }
+
