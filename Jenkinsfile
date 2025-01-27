@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         DOCKER_HOST = "http://192.168.17.153:2375" // Docker API endpoint
+        DOCKERFILE = "Dockerfile" // Ensure the Dockerfile is named and accessible in your repo
     }
 
     stages {
@@ -16,11 +17,26 @@ pipeline {
             steps {
                 script {
                     try {
-                        echo "Starting Docker build..."
-                        // Use PowerShell to call Docker build through API
+                        echo "Starting Docker build via API..."
+
+                        // Set up build URL for Docker API
                         def buildUrl = "${env.DOCKER_HOST}/build?t=python-app1:latest"
+
+                        // Build request using PowerShell to call the Docker API
                         def response = powershell(script: """
-                            \$response = Invoke-RestMethod -Uri '$buildUrl' -Method Post
+                            \$dockerBuildUrl = '$buildUrl'
+                            \$dockerFilePath = '${env.DOCKERFILE}'
+                            
+                            # Define the body of the Docker build request
+                            \$body = @{
+                                'dockerfile' = \$dockerFilePath
+                                # Optional: If Docker context or other params are needed
+                                'context' = '.'
+                            } | ConvertTo-Json
+
+                            # Invoke the REST method
+                            \$response = Invoke-RestMethod -Uri \$dockerBuildUrl -Method Post -Body \$body -ContentType 'application/json'
+                            
                             Write-Output 'Response: ' + \$response
                         """, returnStdout: true).trim()
 
