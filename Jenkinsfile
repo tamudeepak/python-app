@@ -44,4 +44,21 @@ pipeline {
                         } catch {
                             Write-Host "Error during build: $_"
                             throw
-
+                        }
+                    '''
+                }
+            }
+        }
+    }
+    post {
+        success {
+            echo 'Build successful! Docker image created.'
+        }
+        failure {
+            echo 'Build failed! Check logs for details.'
+        }
+        always {
+            echo 'Pipeline execution completed!'
+        }
+    }
+}
