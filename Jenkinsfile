@@ -15,31 +15,33 @@ pipeline {
                     powershell '''
                         $ErrorActionPreference = 'Stop'
                         
-                        # Create build context tar
-                        Compress-Archive -Path * -DestinationPath build.zip
+                        # First, let's verify Docker API is accessible
+                        try {
+                            $testApi = Invoke-WebRequest -Uri "${env:DOCKER_API}/version" -Method GET
+                            Write-Host "Docker API is accessible"
+                        } catch {
+                            throw "Cannot connect to Docker API: $_"
+                        }
                         
-                        # Build image using Docker API
+                        # Send Dockerfile and context directly
+                        $headers = @{
+                            'Content-Type' = 'application/x-tar'
+                        }
+                        
                         $buildUrl = "${env:DOCKER_API}/build?t=python-app1:latest"
                         
                         Write-Host "Starting Docker build via API..."
-                        Invoke-WebRequest -Uri $buildUrl -Method POST -InFile build.zip -ContentType "application/x-tar"
                         
-                        Write-Host "Build completed successfully!"
-                    '''
-                }
-            }
-        }
-    }
-    post {
-        success {
-            echo 'Build successful! Docker image created.'
-        }
-        failure {
-            echo 'Build failed! Check logs for details.'
-        }
-        always {
-            echo 'Pipeline execution completed!'
-            powershell 'Remove-Item -Path build.zip -ErrorAction SilentlyContinue'
-        }
-    }
-}
+                        # Read Dockerfile content
+                        $dockerfileContent = Get-Content -Path Dockerfile -Raw
+                        
+                        # Create a simple tar-like structure
+                        $body = [System.Text.Encoding]::UTF8.GetBytes($dockerfileContent)
+                        
+                        try {
+                            $response = Invoke-RestMethod -Uri $buildUrl -Method Post -Body $body -Headers $headers
+                            Write-Host "Build Response: $response"
+                        } catch {
+                            Write-Host "Error during build: $_"
+                            throw
+
