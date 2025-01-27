@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_HOST = "http://192.168.17.153:2375" // Docker API endpoint
+        DOCKER_HOST = "http://192.18.1.13:2375" // Docker API endpoint
         DOCKERFILE = "Dockerfile" // Ensure the Dockerfile is named and accessible in your repo
     }
 
