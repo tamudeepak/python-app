@@ -1,7 +1,7 @@
 pipeline {
     agent any
     environment {
-        DOCKER_HOST = "tcp://192.168.17.153:2375"
+        DOCKER_API = "http://192.168.17.153:2375"
     }
     stages {
         stage('Checkout Code') {
@@ -12,10 +12,20 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Use powershell instead of sh for Windows
-                    powershell """
-                        docker -H tcp://192.168.17.153:2375 build -t python-app1:latest .
-                    """
+                    powershell '''
+                        $ErrorActionPreference = 'Stop'
+                        
+                        # Create build context tar
+                        Compress-Archive -Path * -DestinationPath build.zip
+                        
+                        # Build image using Docker API
+                        $buildUrl = "${env:DOCKER_API}/build?t=python-app1:latest"
+                        
+                        Write-Host "Starting Docker build via API..."
+                        Invoke-WebRequest -Uri $buildUrl -Method POST -InFile build.zip -ContentType "application/x-tar"
+                        
+                        Write-Host "Build completed successfully!"
+                    '''
                 }
             }
         }
@@ -29,6 +39,7 @@ pipeline {
         }
         always {
             echo 'Pipeline execution completed!'
+            powershell 'Remove-Item -Path build.zip -ErrorAction SilentlyContinue'
         }
     }
 }
